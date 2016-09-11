@@ -472,11 +472,9 @@ merge(TetrisSeconderyField.prototype, {
 
   //Override
   deleteLines: function(axis, index, range) {
-    log("deleteline", axis, index, range)
-     range = range ? range : 1;
+    range = range ? range : 1;
     if(axis) {
       for(let i = parseInt(index) + parseInt(range); i < this.getWidth(); i++) {
-        log("linemove", i, this.blocks[i], "->", i - range, this.blocks[i - range]);
         this.blocks[i - range] = this.blocks[i];
         for(let o in this.blocks[i - range]) {
           if(this.blocks[i - range][o] instanceof Block)
@@ -487,7 +485,6 @@ merge(TetrisSeconderyField.prototype, {
     }else {
       for(let i = 0; i < this.blocks.length; i++) {
         for(let o = parseInt(index) + parseInt(range); o < this.getWidth(); o++) {
-          log("linemove", o, this.blocks[i][o], "->", o - range, this.blocks[i][o - range]);
           this.blocks[i][o - range] = this.blocks[i][o];
           if(this.blocks[i][o - range] instanceof Block)
             this.blocks[i][o - range].moveLeft(range);
@@ -508,13 +505,13 @@ let TetrisData = {
   mapHeight: 20, //Not used
   pieces: [
     new PieceData("I piece", [new Vector2(0, 0), new Vector2(0, 1),
-      new Vector2(0, -1), new Vector2(0, -2)], "#03A9F4"),
-    new PieceData("O piece", [new Vector2(0, 0), new Vector2(0, -1),
-      new Vector2(-1, -1), new Vector2(-1, 0)], "#FFEB3B"),
-    new PieceData("S piece", [new Vector2(0, 0), new Vector2(0, 1),
-      new Vector2(1, 0), new Vector2(1, -1)], "#8BC34A"),
-    new PieceData("Z piece", [new Vector2(0, 0), new Vector2(0, 1),
-      new Vector2(-1, 0), new Vector2(-1, -1)], "#F44336"),
+      new Vector2(0, 2), new Vector2(0, -1)], "#03A9F4"),
+    new PieceData("O piece", [new Vector2(0, 0), new Vector2(0, 1),
+      new Vector2(1, 1), new Vector2(1, 0)], "#FFEB3B"),
+    new PieceData("S piece", [new Vector2(0, 0), new Vector2(-1, 0),
+      new Vector2(-1, 1), new Vector2(0, -1)], "#8BC34A"),
+    new PieceData("Z piece", [new Vector2(0, 0), new Vector2(1, 0),
+      new Vector2(1, 1), new Vector2(0, -1)], "#F44336"),
     new PieceData("L piece", [new Vector2(0, 0), new Vector2(0, 1),
       new Vector2(0, -1), new Vector2(1, -1)], "#3F51B5"),
     new PieceData("J piece", [new Vector2(0, 0), new Vector2(0, 1),
@@ -715,8 +712,8 @@ Tetris.prototype = {
   instantDrop: function() {
     if(this.field.checkPieceCollision(this.currentPiece
       .preCalculatePiece(this.currentPiece.getLocation()
-      .minus(new Vector2(this.currentDirection ? 0 : 1,
-      this.currentDirection ? 1 : 0))), this.currentDirection)) {
+      .minus(new Vector2(this.currentDirection ? 1 : 0,
+      this.currentDirection ? 0 : 1))), this.currentDirection)) {
         this.mergeCurrentPiece();
         this.shiftNextPieceFromQueue();
         this.swapDirection();
@@ -726,7 +723,7 @@ Tetris.prototype = {
         if(this.getField().checkPieceCollision(this.currentPiece
           .preCalculatePiece(this.currentPiece.getLocation()
           .minus(new Vector2(this.currentDirection ? i : 0,
-          this.currentDirection ? 0 : i))), (this.currentDirection+1)%2)) {
+          this.currentDirection ? 0 : i))), this.currentDirection)) {
 
           this.currentPiece.setLocation(this.currentPiece.getLocation()
             .minus(new Vector2(this.currentDirection ? i-1 : 0,
@@ -780,14 +777,14 @@ Tetris.prototype = {
      this.currentPiece = null;
    },
 
-   checkFilledLines: function() {
+   checkFilledLines: function() { //TODO: Scoreing
      let lines = this.field.getFilledLine();
      if(lines[0].length > 0 || lines[1].length > 0) {
        for(let i in lines[0]) {
-         this.field.deleteLines(0, i, 1);
+         this.field.deleteLines(0, lines[0][i], 1);
        }
        for(let i in lines[1]) {
-         this.field.deleteLines(1, i, 1);
+         this.field.deleteLines(1, lines[1][i], 1);
        }
      }
    },
@@ -844,12 +841,74 @@ ctx.drawBox = function(dx, dy, color) {
   this.fill();
 }
 
+ctx.confirmReset = function() {
+  let time = Date.now() - ctx._confirmReset;
+  if(time < 3000) {
+    this._confirmReset = 0;
+    //this.tetris.stop();
+    this.tetris.reset();
+    this.tetris.start();
+    delete this.drawAfterRegister["confirm_reset"];
+  }else {
+    this._confirmReset = Date.now();
+    this.drawAfterRegister["confirm_reset"] = function(ctx) {
+      let time = Date.now() - ctx._confirmReset;
+      if(time > 3000) {
+        delete ctx.drawAfterRegister["confirm_reset"];
+      }else {
+        ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+        ctx.fillRect(0, ctx.height/10, ctx.width, 160);
+
+        ctx.fillStyle = "#fff";
+        ctx.globalAlpha = 1 - pow(time%1000/1000, 3);
+        ctx.font = "50px Quantico";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(3 - floor(time/1000),
+          ctx.width/2, ctx.height/10 + 80);
+        ctx.globalAlpha = 1;
+        ctx.font = "italic 30px Quantico";
+        ctx.fillText("Press again RESET Button", ctx.width/2 - 5, ctx.height/10 + 25);
+        ctx.fillText("to Start New Game", ctx.width/2 - 5, ctx.height/10 + 135)
+
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+        ctx.lineCap = "butt";
+        ctx.beginPath();
+        ctx.arc(ctx.width/2, ctx.height/10 + 80, 30, -PI/2, -PI/2
+        + PI*2*time/3000, true);
+        ctx.stroke();
+
+        ctx.strokeStyle = "#f00";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(0, ctx.height/10);
+        ctx.lineTo(ctx.width, ctx.height/10);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, ctx.height/10 + 160);
+        ctx.lineTo(ctx.width, ctx.height/10 + 160);
+        ctx.stroke();
+      }
+    }
+  }
+}
+
 //Event
 ctx.setup = function() {
   this.twinkle = function() {return round(abs((Date.now()%4000) - 2000) / 2000 * 80) + 100}
+
   this.tetris = new Tetris();
   this.tetris.start();
   setInterval(function() {ctx.tetris.tick()}, 100);
+
+  this._confirmReset = 0;
+
+  this.drawBeforeRegister = [];
+  this.drawAfterRegister = [];
+  this.drawBeforeRegister["tetris"] = function(ctx) {ctx.tetris.sketchBeforeDraw(ctx)};
+  this.drawAfterRegister["tetris"] = function(ctx) {ctx.tetris.sketchAfterDraw(ctx)};
 }
 
 ctx.resize = function() { //화면사이즈 바뀔때마다 단위 갱신
@@ -872,7 +931,10 @@ ctx.resize = function() { //화면사이즈 바뀔때마다 단위 갱신
 
 
 ctx.draw = function() {
-  this.tetris.sketchBeforeDraw(this);
+  for(let i in this.drawBeforeRegister) {
+    if(typeof this.drawBeforeRegister[i] === "function")
+      this.drawBeforeRegister[i](this);
+  }
 
   //블럭 경계선
   this.strokeStyle = "#222";
@@ -937,7 +999,10 @@ ctx.draw = function() {
   this.closePath();
   this.stroke();
 
-  this.tetris.sketchAfterDraw(this);
+  for(let i in this.drawAfterRegister) {
+    if(typeof this.drawAfterRegister[i] === "function")
+      this.drawAfterRegister[i](this);
+  }
 }
 
 ctx.keydown = function() {
@@ -961,6 +1026,26 @@ ctx.keydown = function() {
     case this.keys.SPACE:
       this.tetris.instantDrop();
       this.keys.SPACE = false;
+      break;
+    case this.keys.Z:
+      this.tetris.instantDrop();
+      this.keys.Z = false;
+      break;
+    case this.keys.X:
+      this.tetris.attachWall();
+      this.keys.X = false;
+      break;
+    case this.keys.C:
+      this.tetris.holdPiece();
+      this.keys.C = false;
+      break;
+    case this.keys.P:
+      this.tetris.togglePause();
+      this.keys.P = false;
+      break;
+    case this.keys.R:
+      this.confirmReset();
+      this.keys.R = false;
       break;
   }
 }

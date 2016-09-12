@@ -1,6 +1,5 @@
 'use strict'
 
-let log = console.log;
 let timer = {
   timers: {},
   pauses: {},
@@ -30,7 +29,7 @@ let timer = {
 }
 
 //Init Objects =================================================================
-log("Init Objects...");
+console.log("Init Objects...");
 timer.start(0);
 
 function merge(a, b) {for (var attrname in b) a[attrname] = b[attrname]}
@@ -40,6 +39,91 @@ Number.isInteger = Number.isInteger || function(value) {
   return typeof value === "number" &&
     isFinite(value) &&
     Math.floor(value) === value;
+}
+
+function parseColor(color) {
+  let r, g, b;
+  if(color.match(/^#...$/)) {
+    r = parseInt(color[1] + color[1], 16);
+    g = parseInt(color[2] + color[2], 16);
+    b = parseInt(color[3] + color[3], 16);
+  }else if(color.match(/^#......$/)) {
+    r = parseInt(color[1] + color[2], 16);
+    g = parseInt(color[3] + color[4], 16);
+    b = parseInt(color[5] + color[6], 16);
+  }else  {
+    throw new Error("[Error] Sketch.getMoreColor.color: unknown color("+color+")");
+  }
+  return [r, g, b];
+}
+
+function stringifyColor(r, g, b) {
+  function fix(str) {
+    if(str.length === 1) return "0" + str;
+    return str;
+  }
+
+  return "#"+fix(r.toString(16))+fix(g.toString(16))+fix(b.toString(16));
+}
+
+function rgbToHsv(originR, originG, originB) {
+  let r, g, b, h, s, v, dr, dg, db, cMin, cMax, dMax;
+  r = originR / 255                     //RGB from 0 to 255
+  g = originG / 255
+  b = originB / 255
+
+  cMin = Math.min(r, g, b)    //Min. value of RGB
+  cMax = Math.max(r, g, b)    //Max. value of RGB
+  dMax = cMax - cMin;             //Delta RGB value
+
+  v = cMax;
+
+  if(dMax === 0) {                     //This is a gray, no chroma...
+    h = 0;                                //HSV results from 0 to 1
+    s = 0;
+  }else {                                  //Chromatic data...
+    s = dMax / cMax;
+
+    dr = (((cMax - r)/6) + (dMax/2)) / dMax;
+    dg = (((cMax - g)/6) + (dMax/2)) / dMax;
+    db = (((cMax - b)/6) + (dMax/2)) / dMax;
+
+    if(r === cMax) h = db - dg;
+    else if(g === cMax) h = (1/3) + dr - db;
+    else if(b === cMax) h = (2/3) + dg - dr;
+
+    if (h<0) h += 1
+    if (h>1) h -= 1
+  }
+  return [h, s, v];
+}
+
+function hsvToRgb(h, s, v) {
+  let ch, ci, c1, c2, c3, cr, cg, cb, r, g, b;
+  if(s === 0) {                       //HSV from 0 to 1
+    r = v*255;
+    g = v*255;
+    b = v*255;
+  }else {
+    ch = h*6;
+    if (ch === 6) ch = 0;      //H must be < 1
+    ci = parseInt(ch);            //Or ... var_i = floor( var_h )
+    c1 = v * (1-s);
+    c2 = v * (1-s * (ch-ci));
+    c3 = v * (1-s * (1-(ch-ci)));
+
+    if      (ci === 0) {cr = v ; cg = c3; cb = c1}
+    else if (ci === 1) {cr = c2; cg = v ; cb = c1}
+    else if (ci === 2) {cr = c1; cg = v ; cb = c3}
+    else if (ci === 3) {cr = c1; cg = c2; cb = v }
+    else if (ci === 4) {cr = c3; cg = c1; cb = v }
+    else               {cr = v ; cg = c1; cb = c2}
+
+    r = cr * 255                  //RGB results from 0 to 255
+    g = cg * 255
+    b = cb * 255
+  }
+  return [parseInt(Math.round(r)), parseInt(Math.round(g)), parseInt(Math.round(b))];
 }
 
 /**
@@ -351,7 +435,7 @@ TetrisField.prototype = {
       throw new TypeError("TetrisField.mergeBlock.block must instance of Block");
     let tmp = this.blocks[block.getY()][block.getX()];
     if(tmp)
-      log("[Warning] TetrisField.mergeBlock: Try override already exists location("
+      console.log("[Warning] TetrisField.mergeBlock: Try override already exists location("
         +block.toString()+")");
     this.blocks[block.getY()][block.getX()] = block;
   },
@@ -495,9 +579,9 @@ merge(TetrisSeconderyField.prototype, {
   }
 });
 
-log("Done("+timer.stop(0)+"ms)");
+console.log("Done("+timer.stop(0)+"ms)");
 //Init defulat value ===========================================================
-log("Init default value...");
+console.log("Init default value...");
 timer.start(1);
 
 let TetrisData = {
@@ -521,9 +605,9 @@ let TetrisData = {
   ]
 }
 
-log("Done("+timer.stop(1)+"ms)");
+console.log("Done("+timer.stop(1)+"ms)");
 //Init Tetris ==================================================================
-log("Init Tetris...");
+console.log("Init Tetris...");
 timer.start(2);
 
 /***
@@ -548,11 +632,14 @@ Tetris.prototype = {
     this.lastKeyEnter = 0;
     this.currentDirection = 0; //reverse
     this.currentPiece = this.createPiece(this.currentDirection);
+    this.pieceAppearAnimateTiming = [Date.now(), Date.now()];
+    this.pieceAppearAnimateDelay = 1000;
     this.nextPieceQueue = [];
     this.nextPieceQueueMax = 1;
     this.actionDelay = 1000;
 
     this.ready = false;
+    this._pause = false;
   },
 
   start: function() {
@@ -562,17 +649,29 @@ Tetris.prototype = {
 
   stop: function() {
     this.ready = false;
+  },
+
+  isRun: function() {
+    return this.ready;
+  },
+
+  pause: function() {
+    this._pause = true;
     this.pauseTiming = Date.now();
   },
 
   restart: function() {
     this.lastWork += Date.now() - this.pauseTiming;
-    this.ready = true;
+    this._pause = false;
+  },
+
+  isPause: function() {
+    return this._pause
   },
 
   tick: function() {
     //0.05초마다 실행
-    if(!this.ready) return;
+    if(!this.ready || this._pause) return;
     if(Date.now() - this.lastWork > this.actionDelay) {
       while(this.nextPieceQueue.length < this.nextPieceQueueMax)
         this.addNewPieceInQueue();
@@ -646,70 +745,77 @@ Tetris.prototype = {
   },
 
   moveLeft: function() {
+    if(!this.ready || this._pause) return;
     let direction = this.currentDirection ? "up" : "left";
     if(!this.field.checkPieceCollision(
       this.currentPiece.preCalculatePiece(direction), this.currentDirection)) {
 
       this.currentPiece.setLocation(direction);
+      this.lastKeyEnter = Date.now();
     }
-    this.lastKeyEnter = Date.now();
   },
 
   moveUp: function() {
+    if(!this.ready || this._pause) return;
     let direction = this.currentDirection ? "right" : "up";
     if(!this.field.checkPieceCollision(
       this.currentPiece.preCalculatePiece(direction), this.currentDirection)) {
 
       this.currentPiece.setLocation(direction);
+      this.lastKeyEnter = Date.now();
     }
-    this.lastKeyEnter = Date.now();
   },
 
   moveRight: function() {
+    if(!this.ready || this._pause) return;
     let direction = this.currentDirection ? "down" : "right";
     if(!this.field.checkPieceCollision(
       this.currentPiece.preCalculatePiece(direction), this.currentDirection)) {
 
       this.currentPiece.setLocation(direction);
+      this.lastKeyEnter = Date.now();
     }
-    this.lastKeyEnter = Date.now();
   },
 
   moveDown: function() {
+    if(!this.ready || this._pause) return;
     let direction = this.currentDirection ? "left" : "down";
     if(!this.field.checkPieceCollision(
       this.currentPiece.preCalculatePiece(direction), this.currentDirection)) {
 
       this.currentPiece.setLocation(direction);
+      this.lastKeyEnter = Date.now();
     }
-    this.lastKeyEnter = Date.now();
   },
 
   rotateLeft: function() {
+    if(!this.ready || this._pause) return;
     let rot = (this.currentPiece.getRotation()+3)%4;
     if(!this.field.checkPieceCollision(
       this.currentPiece.preCalculatePiece(null, rot), this.currentDirection)) {
 
       this.currentPiece.setRotation(rot);
+      this.lastKeyEnter = Date.now();
     }else {
       //TODO: Implement T-Flip Flop and smooth rotate S, Z Piece
     }
-    this.lastKeyEnter = Date.now();
   },
 
   rotateRight: function() {
+    if(!this.ready || this._pause) return;
     let rot = (this.currentPiece.getRotation()+1)%4;
     if(!this.field.checkPieceCollision(
       this.currentPiece.preCalculatePiece(null, rot), this.currentDirection)) {
 
       this.currentPiece.setRotation(rot);
+      this.lastKeyEnter = Date.now();
     }else {
       //TODO: Implement T-Flip Flop and smooth rotate S, Z Piece
     }
-    this.lastKeyEnter = Date.now();
   },
 
   instantDrop: function() {
+    if(!this.ready || this._pause) return;
     if(this.field.checkPieceCollision(this.currentPiece
       .preCalculatePiece(this.currentPiece.getLocation()
       .minus(new Vector2(this.currentDirection ? 1 : 0,
@@ -763,7 +869,7 @@ Tetris.prototype = {
 
   shiftNextPieceFromQueue: function() {
     if(this.currentPiece)
-      log("[Warning] Tetris.currentPiece is already exists("
+      console.log("[Warning] Tetris.currentPiece is already exists("
         +this.currentPiece.toString()+"). Try override...");
     this.currentPiece = this.nextPieceQueue.shift();
   },
@@ -794,9 +900,9 @@ Tetris.prototype = {
    }
 }
 
-log("Done("+timer.stop(2)+"ms)");
+console.log("Done("+timer.stop(2)+"ms)");
 //Init Sketch ==================================================================
-log("Init Sketch...");
+console.log("Init Sketch...");
 timer.start(3);
 
 let ctx = Sketch.create();
@@ -827,23 +933,215 @@ ctx.diagonal = function(x, y, size, direction) {
   }
 }
 
-ctx.drawBox = function(dx, dy, color) {
-  let x = this.unit.hCenter + dx*this.unit.horizontalBox - dy*this.unit.horizontalBox;
-  let y = this.height - this.unit.vPadding - (dx+dy)*this.unit.horizontalBox;
+ctx.getMoreColor = function(color) {
+  let originRGB;
+  try {
+    originRGB = parseColor(color);
+  }catch(err) {
+    console.log("[Error]", err, err.message);
+    return [color, color, color];
+  }
 
-  this.fillStyle = color;
+  let hsv = rgbToHsv(originRGB[0], originRGB[1], originRGB[2]);
+  let llv = hsv[2] + 0.2;
+  let lv = hsv[2] + 0.05;
+  let dv = hsv[2] - 0.05;
+  let ddv = hsv[2] - 0.2;
+
+  let llc = hsvToRgb(hsv[0], hsv[1], llv < 1 ? llv : 1);
+  let lc = hsvToRgb(hsv[0], hsv[1], lv < 1 ? lv : 1);
+  let dc = hsvToRgb(hsv[0], hsv[1], dv > 0 ? dv : 0);
+  let ddc = hsvToRgb(hsv[0], hsv[1], ddv > 0 ? ddv : 0);
+  return [stringifyColor(llc[0], llc[1], llc[2]), stringifyColor(lc[0], lc[1], lc[2]),
+    color, stringifyColor(dc[0], dc[1], dc[2]), stringifyColor(ddc[0], ddc[1], ddc[2])];
+}
+
+ctx.drawBox = function(dx, dy, color, unit1, ax, ay) {
+  if(!unit1) unit1 = this.unit.horizontalBox;
+  if(!ax) ax = 0;
+  if(!ay) ay = 0;
+  let x = this.unit.hCenter + dx*unit1 - dy*unit1;
+  let y = this.height - this.unit.vPadding - (dx+dy)*unit1;
+  let cd = [[x+ax, y+ay], [x+unit1+ax, y-unit1+ay],
+    [x+ax, y-2*unit1+ay], [x-unit1+ax, y-unit1+ay]];
+
+  if(!this._moreColor[color]) { //부담이 큰 작업이므로 첫 로드때만 초기화
+    this._moreColor[color] = this.getMoreColor(color);
+  }
+  color = this._moreColor[color];
+  let blockHeight = unit1/5;
+
+  //Main box
+  //(draw index)
+  //2↙↖1
+  //3↘↗0
+  this.fillStyle = color[2];
   this.beginPath();
-  this.moveTo(x, y);
-  this.lineTo(x+this.unit.horizontalBox, y-this.unit.horizontalBox);
-  this.lineTo(x, y-2*this.unit.horizontalBox);
-  this.lineTo(x-this.unit.horizontalBox, y-this.unit.horizontalBox);
+  this.moveTo(cd[0][0], cd[0][1]);
+  this.lineTo(cd[1][0], cd[1][1]);
+  this.lineTo(cd[2][0], cd[2][1]);
+  this.lineTo(cd[3][0], cd[3][1]);
+  this.closePath();
+  this.fill();
+
+  //Sub box 0 (leftTop)
+  this.fillStyle = color[0];
+  this.beginPath();
+  this.moveTo(cd[2][0], cd[2][1]);
+  this.lineTo(cd[2][0], cd[2][1]+blockHeight);
+  this.lineTo(cd[3][0]+blockHeight, cd[3][1]);
+  this.lineTo(cd[3][0], cd[3][1]);
+  this.closePath();
+  this.fill();
+
+  //Sub box 1 (rightTop)
+  this.fillStyle = color[1];
+  this.beginPath();
+  this.moveTo(cd[2][0], cd[2][1]);
+  this.lineTo(cd[2][0], cd[2][1]+blockHeight);
+  this.lineTo(cd[1][0]-blockHeight, cd[1][1]);
+  this.lineTo(cd[1][0], cd[1][1]);
+  this.closePath();
+  this.fill();
+
+  //Sub box 2 (leftBottom)
+  this.fillStyle = color[4];
+  this.beginPath();
+  this.moveTo(cd[0][0], cd[0][1]);
+  this.lineTo(cd[0][0], cd[0][1]-blockHeight);
+  this.lineTo(cd[3][0]+blockHeight, cd[3][1]);
+  this.lineTo(cd[3][0], cd[3][1]);
+  this.closePath();
+  this.fill();
+
+  //Sub box 3 (rightBottom)
+  this.fillStyle = color[5];
+  this.beginPath();
+  this.moveTo(cd[0][0], cd[0][1]);
+  this.lineTo(cd[0][0], cd[0][1]-blockHeight);
+  this.lineTo(cd[1][0]-blockHeight, cd[1][1]);
+  this.lineTo(cd[1][0], cd[1][1]);
   this.closePath();
   this.fill();
 }
 
+ctx.drawTitle = function(visible) {
+
+}
+
+/**
+ * Draw pause screen
+ * @param {boolean} visible
+ * @return {boolean} success
+ */
+ctx.drawPause = function(visible) {
+  if(this._whilePauseAnimate) return;
+  ctx._pauseAniTiming = Date.now();
+  if(visible) { //Pause screen appear animation
+    this.tetris.pause();
+    this._whilePauseAnimate = true;
+    this._pauseColor = stringifyColor.apply(this, hsvToRgb(random(0, 1), 1, 0.5));
+    this.drawAfterRegister["pause_screen"] = function(ctx) {
+      let t1 = 500;
+      let time = Date.now() - ctx._pauseAniTiming;
+      let rh;
+      if(time < t1) {
+        rh = -ctx.height + ctx.height*pow(time/t1, 3);
+      }else {
+        rh = 0;
+        if(ctx._whilePauseAnimate) ctx._whilePauseAnimate = false;
+      }
+      //위쪽의 검은 덮개타일 그리기
+      ctx.fillStyle = "#222";
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, ctx.height - ctx.unit.vPadding - ctx.unit.hCenter + rh);
+      ctx.lineTo(ctx.unit.hCenter, ctx.height - ctx.unit.vPadding + rh);
+      ctx.lineTo(ctx.width, ctx.height - ctx.unit.vPadding - ctx.unit.hCenter + rh);
+      ctx.lineTo(ctx.width, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      //경계선 좌
+      ctx.strokeStyle = "#000";
+      ctx.beginPath();
+      ctx.moveTo(ctx.unit.hCenter, ctx.height - ctx.unit.vPadding + rh);
+      ctx.lineTo(0, ctx.height - ctx.unit.vPadding - ctx.unit.hCenter + rh);
+      ctx.closePath();
+      ctx.stroke();
+
+      //경계선 우
+      ctx.beginPath();
+      ctx.moveTo(ctx.unit.hCenter, ctx.height - ctx.unit.vPadding + rh);
+      ctx.lineTo(ctx.width, ctx.height - ctx.unit.vPadding - ctx.unit.hCenter + rh);
+      ctx.closePath();
+      ctx.stroke();
+
+      for(let i = 0; i < ctx._pauseBoxString.length; i++) {
+        ctx.drawBox(ctx._pauseBoxString[i][0], ctx._pauseBoxString[i][1],
+          ctx._pauseColor, ctx.unit.staticHorizontalBox(ctx, 25), 0, rh);
+      }
+    }
+  }else { //Pause screen dismiss animation
+    this._whilePauseAnimate = true;
+    this.drawAfterRegister["pause_screen"] = function(ctx) {
+      let t1 = 500;
+      let time = Date.now() - ctx._pauseAniTiming;
+      let rh;
+      if(time < t1) {
+        rh = -ctx.height*pow(time/t1, 3);
+      }else {
+        delete ctx.drawAfterRegister["pause_screen"];
+        ctx._whilePauseAnimate = false;
+        ctx.tetris.restart();
+        return;
+      }
+      //위쪽의 검은 덮개타일 그리기
+      ctx.fillStyle = "#222";
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, ctx.height - ctx.unit.vPadding - ctx.unit.hCenter + rh);
+      ctx.lineTo(ctx.unit.hCenter, ctx.height - ctx.unit.vPadding + rh);
+      ctx.lineTo(ctx.width, ctx.height - ctx.unit.vPadding - ctx.unit.hCenter + rh);
+      ctx.lineTo(ctx.width, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      //경계선 좌
+      ctx.strokeStyle = "#000";
+      ctx.beginPath();
+      ctx.moveTo(ctx.unit.hCenter, ctx.height - ctx.unit.vPadding + rh);
+      ctx.lineTo(0, ctx.height - ctx.unit.vPadding - ctx.unit.hCenter + rh);
+      ctx.closePath();
+      ctx.stroke();
+
+      //경계선 우
+      ctx.beginPath();
+      ctx.moveTo(ctx.unit.hCenter, ctx.height - ctx.unit.vPadding + rh);
+      ctx.lineTo(ctx.width, ctx.height - ctx.unit.vPadding - ctx.unit.hCenter + rh);
+      ctx.closePath();
+      ctx.stroke();
+
+      for(let i = 0; i < ctx._pauseBoxString.length; i++) {
+        ctx.drawBox(ctx._pauseBoxString[i][0], ctx._pauseBoxString[i][1],
+          ctx._pauseColor, ctx.unit.staticHorizontalBox(ctx, 25), 0, rh);
+      }
+    }
+  }
+}
+
+ctx.drawGameover = function(visible) {
+
+}
+
 ctx.confirmReset = function() {
   let time = Date.now() - ctx._confirmReset;
-  if(time < 3000) {
+  /*
+   * 0 ~ 250ms: Popup window
+   * 250 ~ 3250ms: Waiting
+   * 3250 ~ 3500ms: Colse window
+   */
+  if(time < 3400) {
     this._confirmReset = 0;
     //this.tetris.stop();
     this.tetris.reset();
@@ -853,57 +1151,119 @@ ctx.confirmReset = function() {
     this._confirmReset = Date.now();
     this.drawAfterRegister["confirm_reset"] = function(ctx) {
       let time = Date.now() - ctx._confirmReset;
-      if(time > 3000) {
+      let t1 = 150, t2 = 3000, t3 = 150;
+      if(time > t1+t2+t3) {
         delete ctx.drawAfterRegister["confirm_reset"];
       }else {
-        ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
-        ctx.fillRect(0, ctx.height/10, ctx.width, 160);
 
-        ctx.fillStyle = "#fff";
-        ctx.globalAlpha = 1 - pow(time%1000/1000, 3);
-        ctx.font = "50px Quantico";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(3 - floor(time/1000),
-          ctx.width/2, ctx.height/10 + 80);
-        ctx.globalAlpha = 1;
-        ctx.font = "italic 30px Quantico";
-        ctx.fillText("Press again RESET Button", ctx.width/2 - 5, ctx.height/10 + 25);
-        ctx.fillText("to Start New Game", ctx.width/2 - 5, ctx.height/10 + 135)
+        if(time < t1) {
+          let h1 = ctx.height/10 + 80*pow((t1-time)/t1, 4);
+          let h2 = 160 - 160*pow((t1-time)/t1, 4);
+          //반투명 박스
+          ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+          ctx.fillRect(0, h1, ctx.width, h2);
 
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 3;
-        ctx.lineCap = "butt";
-        ctx.beginPath();
-        ctx.arc(ctx.width/2, ctx.height/10 + 80, 30, -PI/2, -PI/2
-        + PI*2*time/3000, true);
-        ctx.stroke();
+          //상자 위쪽 경계선
+          ctx.strokeStyle = "#f00";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, h1);
+          ctx.lineTo(ctx.width, h1);
+          ctx.stroke();
 
-        ctx.strokeStyle = "#f00";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(0, ctx.height/10);
-        ctx.lineTo(ctx.width, ctx.height/10);
-        ctx.stroke();
+          //상자 아래쪽 경계선
+          ctx.beginPath();
+          ctx.moveTo(0, h1 + h2);
+          ctx.lineTo(ctx.width, h1 + h2);
+          ctx.stroke();
+        }else if(time < t1+t2) {
+          let cTime = time - t1;
+          //반투명 박스
+          ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+          ctx.fillRect(0, ctx.height/10, ctx.width, 160);
 
-        ctx.beginPath();
-        ctx.moveTo(0, ctx.height/10 + 160);
-        ctx.lineTo(ctx.width, ctx.height/10 + 160);
-        ctx.stroke();
+          //카운트 다운 숫자 와 안내 메시지
+          ctx.fillStyle = "#fff";
+          ctx.globalAlpha = 1 - pow(cTime%1000/1000, 3);
+          ctx.font = "50px Quantico";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(3 - floor(cTime/1000),
+            ctx.width/2, ctx.height/10 + 80);
+          ctx.globalAlpha = 1;
+          ctx.font = "italic 30px Quantico";
+          ctx.fillText("Press again RESET Button", ctx.width/2 - 5, ctx.height/10 + 25);
+          ctx.fillText("to Start New Game", ctx.width/2 - 5, ctx.height/10 + 135)
+
+          //원형 프로그래스 바
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 3;
+          ctx.lineCap = "butt";
+          ctx.beginPath();
+          ctx.arc(ctx.width/2, ctx.height/10 + 80, 30, -PI/2, -PI/2
+          + PI*2*cTime/t2, true);
+          ctx.stroke();
+
+          //상자 위쪽 경계선
+          ctx.strokeStyle = "#f00";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, ctx.height/10);
+          ctx.lineTo(ctx.width, ctx.height/10);
+          ctx.stroke();
+
+          //상자 아래쪽 경계선
+          ctx.beginPath();
+          ctx.moveTo(0, ctx.height/10 + 160);
+          ctx.lineTo(ctx.width, ctx.height/10 + 160);
+          ctx.stroke();
+        }else {
+          let cTime = time - (t1+t2);
+          let h1 = ctx.height/10 + 80 - 80*pow((t3-cTime)/t3, 4);
+          let h2 = 160*pow((t3-cTime)/t3, 4);
+          //반투명 박스
+          ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+          ctx.fillRect(0, h1, ctx.width, h2);
+
+          //상자 위쪽 경계선
+          ctx.strokeStyle = "#f00";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(0, h1);
+          ctx.lineTo(ctx.width, h1);
+          ctx.stroke();
+
+          //상자 아래쪽 경계선
+          ctx.beginPath();
+          ctx.moveTo(0, h1 + h2);
+          ctx.lineTo(ctx.width, h1 + h2);
+          ctx.stroke();
+        }
       }
     }
   }
 }
 
-//Event
-ctx.setup = function() {
-  this.twinkle = function() {return round(abs((Date.now()%4000) - 2000) / 2000 * 80) + 100}
+ctx.twinkle = function() {return round(abs((Date.now()%4000) - 2000) / 2000 * 80) + 100}
 
-  this.tetris = new Tetris();
+//Event
+ctx.setup = function() { //Setup default values
+  this._whilePauseAnimate = false;
+  this._pauseAniTiming = 0;
+  this._pauseBoxString = [
+    [3, 7], [4, 7], [5, 7], [3, 6], [5, 6], [3, 5], [4, 5], [5, 5], [3, 4], [3, 3], //P
+    [7, 7], [8, 7], [9, 7], [7, 6], [9, 6], [7, 5], [8, 5], [9, 5], [7, 4], [9, 4], [7, 3], [9, 3], //A
+    [11, 7], [13, 7], [11, 6], [13, 6], [11, 5], [13, 5], [11, 4], [13, 4], [11, 3], [12, 3], [13, 3], //U
+    [15, 7], [16, 7], [17, 7], [15, 6], [15, 5], [16, 5], [17, 5], [17, 4], [15, 3], [16, 3], [17, 3], //S
+    [19, 7], [20, 7], [21, 7], [19, 6], [19, 5], [20, 5], [21, 5], [19, 4], [19, 3], [20, 3], [21, 3]  //E
+  ];
+  this._pauseColor = "#ffffff";
+  this._confirmReset = 0;
+  this._moreColor = [];
+
+  this.tetris = new Tetris(); //Magic start here
   this.tetris.start();
   setInterval(function() {ctx.tetris.tick()}, 100);
-
-  this._confirmReset = 0;
 
   this.drawBeforeRegister = [];
   this.drawAfterRegister = [];
@@ -913,6 +1273,7 @@ ctx.setup = function() {
 
 ctx.resize = function() { //화면사이즈 바뀔때마다 단위 갱신
   this.unit = {
+    screenOrientation: this.width > this.height*9/10, //좌우로 길때 true
     //width:100%,height:90%의 절반의 길이의 정사각형의 대각선길이 맵길이 등분
     box: this.width > this.height*9/10
       ? this.height*9/10/2*sqrt(2)/this.tetris.getField().getWidth()
@@ -921,12 +1282,19 @@ ctx.resize = function() { //화면사이즈 바뀔때마다 단위 갱신
     horizontalBox: this.width > this.height*9/10
       ? this.height*9/10/2*pow(sqrt(2), 2)/this.tetris.getField().getWidth()/2
       : this.width/2*pow(sqrt(2), 2)/this.tetris.getField().getWidth()/2,
+    //특수 목적용 박스사이즈
+    staticBox: function(ctx, count) {return ctx.width > ctx.height*9/10
+      ? ctx.height*9/10/2*sqrt(2)/count : ctx.width/2*sqrt(2)/count},
+    staticHorizontalBox: function(ctx, count) {return ctx.width > ctx.height*9/10
+      ? ctx.height*9/10/2*pow(sqrt(2), 2)/count/2
+      : ctx.width/2*pow(sqrt(2), 2)/count/2},
     //화면 중앙
     hCenter: this.width/2,
     //상하 패딩
-    vPadding: this.height/20
+    vPadding: this.width > this.height*9/10 ? this.height/20
+      : (this.height-this.width) / 2
   }
-  log("Resized in " + new Date().toTimeString())
+  console.log("Resized in " + new Date().toTimeString(), this.unit)
 }
 
 
@@ -1040,7 +1408,7 @@ ctx.keydown = function() {
       this.keys.C = false;
       break;
     case this.keys.P:
-      this.tetris.togglePause();
+      this.drawPause(!this.tetris.isPause());
       this.keys.P = false;
       break;
     case this.keys.R:
@@ -1050,4 +1418,4 @@ ctx.keydown = function() {
   }
 }
 
-log("Done("+timer.stop(3)+"ms)");
+console.log("Done("+timer.stop(3)+"ms)");

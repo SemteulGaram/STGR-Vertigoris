@@ -1,0 +1,286 @@
+@import 'https://fonts.googleapis.com/css?family=Audiowide|Iceland|Nova+Square';
+
+body {
+  font-family: 'Audiowide';
+  background-color: #333;
+  color: #eee;
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+noscript {
+  font-size: xx-large;
+  position: fixed;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 48px;
+  margin: 0;
+  margin-top: -24px;
+  text-align: center;
+  z-index: 9;
+}
+
+#header {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 80px;
+  border-left: #41b6FF solid 5px;
+  border-top: #41b6FF solid 5px;
+  border-right: #1166c3 solid 5px;
+  border-bottom: #1166c3 solid 5px;
+  z-index: 9;
+  visibility: hidden;
+}
+
+#content {
+  position: relative;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+#titleScreen  {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  filter: blur(6px);
+  display: none;
+}
+
+#setting {
+  position: fixed;
+  left: 0;
+  bottom: 20px;
+}
+
+#setting2 {
+
+}
+
+.title {
+  position: relative;
+  top: 50%;
+  left: 50%;
+  width: 300px;
+  height: 48px;
+  margin: 0;
+  margin-top: -24px;
+  margin-left: -150px;
+  /* transform: translateX(-50%); */
+  font-size: 48px;
+  line-height: 48px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.setting {
+
+}
+
+.label {
+  display: inline-block;
+}
+
+/***
+ * CSS Checkbox Styles
+ * http://cssdeck.com/labs/css-checkbox-styles
+ */
+.checkbox1 input[type=checkbox] {
+	visibility: hidden;
+}
+
+.checkbox1 {
+	width: 80px;
+	height: 24px;
+	background: #333;
+	margin: 10px;
+
+	position: relative;
+  display: inline-block;
+
+  -webkit-border-radius: 5px;
+  -moz-border-radius: 5px;
+  border-radius: 5px;
+
+	-webkit-box-shadow: inset 0px 1px 1px rgba(0,0,0,0.5), 0px 1px 0px rgba(255,255,255,0.2);
+	-moz-box-shadow: inset 0px 1px 1px rgba(0,0,0,0.5), 0px 1px 0px rgba(255,255,255,0.2);
+	box-shadow: inset 0px 1px 1px rgba(0,0,0,0.5), 0px 1px 0px rgba(255,255,255,0.2);
+}
+
+.checkbox1:after {
+	content: '';
+	position: absolute;
+	top: 11px;
+	left: 8px;
+	height: 2px;
+	width: 62px;
+
+	-webkit-border-radius: 50px;
+	-moz-border-radius: 50px;
+	border-radius: 50px;
+	background: #111;
+
+	-webkit-box-shadow: inset 0px 1px 1px rgba(0,0,0,0.5), 0px 1px 0px rgba(255,255,255,0.2);
+	-moz-box-shadow: inset 0px 1px 1px rgba(0,0,0,0.5), 0px 1px 0px rgba(255,255,255,0.2);
+	box-shadow: inset 0px 1px 1px rgba(0,0,0,0.5), 0px 1px 0px rgba(255,255,255,0.2);
+}
+
+.checkbox1 label {
+	display: block;
+	width: 16px;
+	height: 23px;
+
+	-webkit-transition: all .4s ease;
+	-moz-transition: all .4s ease;
+	-o-transition: all .4s ease;
+	-ms-transition: all .4s ease;
+	transition: all .4s ease;
+	cursor: pointer;
+	position: absolute;
+	top: 1px;
+	z-index: 1;
+	left: 1px;
+
+  -webkit-border-radius: 5px;
+  -moz-border-radius: 5px;
+  border-radius: 5px;
+
+	-webkit-box-shadow: 0px 2px 5px 0px rgba(0,0,0,0.3);
+	-moz-box-shadow: 0px 2px 5px 0px rgba(0,0,0,0.3);
+	box-shadow: inset 0px 5px 5px 0px rgba(255,255,255,0.5);
+	background: #acaaa4;
+}
+
+.checkbox1 label:after {
+	content: '';
+	position: absolute;
+	width: 4px;
+	height: 14px;
+
+	background: #333;
+	left: 6px;
+	top: 4px;
+
+	-webkit-box-shadow: inset 0px 1px 1px rgba(255,255,255,0.5), 0px 1px 0px rgba(0,0,0,0.5);
+	-moz-box-shadow: inset 0px 1px 1px rgba(255,255,255,0.5), 0px 1px 0px rgba(0,0,0,0.5);
+	box-shadow: inset 0px 1px 1px rgba(255,255,255,0.5), 0px 1px 0px rgba(0,0,0,0.5);
+}
+
+.checkbox1 input[type=checkbox]:checked + label {
+	left: 64px;
+}
+
+.checkbox1 input[type=checkbox]:checked + label:after {
+	background: #FF5722;
+}
+
+.bc-red {
+  background-color: #F44336;
+  color: #fff;
+}
+
+.bc-pink {
+  background-color: #E91E63;
+  color: #fff;
+}
+
+.bc-purple {
+  background-color: #9C27B0;
+  color: #fff;
+}
+
+.bc-deep-purple {
+  background-color: #673AB7;
+  color: #fff;
+}
+
+.bc-indigo {
+  background-color: #3F51B5;
+  color: #fff;
+}
+
+.bc-blue {
+  background-color: #2196F3;
+  color: #fff;
+}
+
+.bc-light-blue {
+  background-color: #03A9F4;
+  color: #000;
+}
+
+.bc-cyan {
+  background-color: #00BCD4;
+  color: #000;
+}
+
+.bc-teal {
+  background-color: #009688;
+  color: #fff;
+}
+
+.bc-green {
+  background-color: #4CAF50;
+  color: #000;
+}
+
+.bc-light-green {
+  background-color: #8BC34A;
+  color: #000;
+}
+
+.bc-yellow {
+  background-color: #FFEB3B;
+  color: #000;
+}
+
+.bc-amber {
+  background-color: #FFC107;
+  color: #000;
+}
+
+.bc-orange {
+  background-color: #FF9800;
+  color: #000;
+}
+
+.bc-deep-orange {
+  background-color: #FF5722;
+  color: #fff;
+}
+
+.bc-brown {
+  background-color: #795548;
+  color: #fff;
+}
+
+.bc-gray {
+  background-color: #9E9E9E;
+  color: #000;
+}
+
+.bc-blue-gray {
+  background-color: #607D8B;
+  color: #fff;
+}
+
+.bc-black {
+  background-color: #000;
+  color: #fff;
+}
+
+.bc-white {
+  background-color: #fff;
+  color: #000;
+}

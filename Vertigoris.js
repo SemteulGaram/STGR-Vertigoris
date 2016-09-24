@@ -909,7 +909,7 @@ Tetris.prototype = {
 
   rotateLeft: function() {
     if(!this.ready || this._pause) return;
-    let rot = (this.currentPiece.getRotation()+3)%4;
+    let rot = (this.currentPiece.getRotation()+1)%4;
     if(!this.field.checkPieceCollision(
       this.currentPiece.preCalculatePiece(null, rot), this.currentDirection)) {
 
@@ -922,7 +922,7 @@ Tetris.prototype = {
 
   rotateRight: function() {
     if(!this.ready || this._pause) return;
-    let rot = (this.currentPiece.getRotation()+1)%4;
+    let rot = (this.currentPiece.getRotation()+3)%4;
     if(!this.field.checkPieceCollision(
       this.currentPiece.preCalculatePiece(null, rot), this.currentDirection)) {
 
@@ -1515,8 +1515,25 @@ function setupContext() {
   }
 
   ctx.tick = function() {
-    for(let i in this._touchButtons) {
-      this._touchButtons[i].tick();
+    if(this.touchMode) {
+      let indexes = [];
+      for(let i in this.touches) {
+        for(let j in this._touchButtons) {
+          if(this._touchButtons[j].inCollision(new Vector2(this.touches[i].x, this.touches[i].y)))
+            indexes.push(j);
+        }
+      }
+
+      for(let i in this._onCollisionButtonIndexes) {
+        if(indexes.indexOf(this._onCollisionButtonIndexes[i]) === -1) {
+          this._touchButtons[this._onCollisionButtonIndexes[i]].clickEnd();
+          this._onCollisionButtonIndexes.splice(i, 1);
+        }
+      }
+
+      for(let i in this._touchButtons) {
+        this._touchButtons[i].tick();
+      }
     }
   }
 
@@ -1656,7 +1673,7 @@ function setupContext() {
         this.keys.LEFT = false;
         break;
       case this.keys.UP:
-        this.tetris.rotateLeft();
+        this.tetris.rotateRight();
         this.keys.UP = false;
         break;
       case this.keys.RIGHT:
@@ -1672,7 +1689,7 @@ function setupContext() {
         this.keys.SPACE = false;
         break;
       case this.keys.Z:
-        this.tetris.instantDrop();
+        this.tetris.rotateLeft();
         this.keys.Z = false;
         break;
       case this.keys.X:
@@ -1709,15 +1726,9 @@ function setupContext() {
         this._touchButtons[indexes[i]].clickStart();
       }
     }
-
-    for(let i in this._onCollisionButtonIndexes) {
-      if(indexes.indexOf(this._onCollisionButtonIndexes[i]) === -1) {
-        this._touchButtons[this._onCollisionButtonIndexes[i]].clickEnd();
-        this._onCollisionButtonIndexes.splice(i, 1);
-      }
-    }
   }
 
+/* Reason: Move to ctx.tick()
   ctx.touchmove = function() {
     let indexes = [];
     for(let i in this.touches) {
@@ -1734,7 +1745,9 @@ function setupContext() {
       }
     }
   }
+  */
 
+  //Only Desktop Code (Mobile touchEnder is work on ctx.tick())
   ctx.touchend = function(ender) {
     for(let i in this._touchButtons) {
       if(this._touchButtons[i].inCollision(new Vector2(ender.x, ender.y))) {
@@ -1743,6 +1756,7 @@ function setupContext() {
       }
     }
   }
+
 }
 
 console.log("Done("+timer.stop(3)+"ms)");

@@ -2,10 +2,10 @@
 <!--GAME TYPE TETRIS-->
 <html>
   <head>
-    <meta charset=utf-8>
-    <meta name="theme-color" content="#333333">
+    <meta charset=utf-8 />
+    <meta name="theme-color" content="#333333" />
     <title>Vertigoris</title>
-    <link rel=stylesheet href=Vertigoris.css>
+    <link rel=stylesheet href=Vertigoris.css />
     <script type=text/javascript src=js/sketch.js></script>
     <script type=text/javascript src=Vertigoris.js></script>
     <script type=text/javascript>
@@ -30,13 +30,22 @@
   </head>
   <body onLoad="loaded()">
     <div id=content>
+      <div id=sketch></div>
+      <div id=status>
+        <p id=levelLabel class="statusLabel">Level</p>
+        <p id=level class="statusLabel floatR">1</p>
+        <hr>
+        <p id=scoreLabel class="statusLabel">Score</p>
+        <p id=score class="statusLabel floatR">0</p>
+      </div>
       <noscript>This game need javascript :/</noscript>
     </div>
     <div id=titleScreen>
       <svg id=title></svg>
+      <button id=start type=button value="Start" autofocus onClick="onStartButton()">Start</button>
       <div id=setting class=setting>
         <div class=checkbox1>
-          <input id=setting_touchMode type=checkbox value=None name=check>
+          <input id=setting_touchMode type=checkbox value=None name=check />
           <label for=setting_touchMode></label>
         </div>
         <p class="label">Touch screen mode</p>

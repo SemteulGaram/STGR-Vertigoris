@@ -126,6 +126,11 @@ function hsvToRgb(h, s, v) {
   return [parseInt(Math.round(r)), parseInt(Math.round(g)), parseInt(Math.round(b))];
 }
 
+function grayScale(r, g, b) {
+  let c = parseInt((rgbToHsv(r, g, b)[2])*255);
+  return [c, c, c];
+}
+
 /**
  * Vector2
  * @constructor
@@ -285,17 +290,21 @@ CanvasButton.prototype = {
     ctx.arcTo(this._v1.getX(), this._v1.getY(), this._v1.getX() + radius, this._v1.getY(), radius);
     ctx.closePath();
 
+    /* Reason: bad performance
     ctx.shadowBlur = 10;
     ctx.shadowOffsetX = radius/4;
     ctx.shadowOffsetY = radius/4;
     ctx.shadowColor = "Blank";
+    */
     ctx.fillStyle = isClick ? bgClickColor : bgColor;
     ctx.fill();
 
+    /*
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
     ctx.shadowColor = "#000000";
+    */
   }
 }
 
@@ -522,9 +531,9 @@ TetrisField.prototype = {
   checkCollision: function(block) {
     if(!(block instanceof Block))
       throw new TypeError("TetrisField.checkCollision.block must instance of Block");
-    return block.getY() >= this.getHeight() ? false : this.checkBlockCollision(block)
-      || block.getX() < 0 || block.getX() >= this.getWidth()
-      || block.getY() < 0;
+    return block.getY() >= this.getHeight() ? false
+      : this.checkBlockCollision(block) || block.getX() < 0
+      || block.getX() >= this.getWidth() || block.getY() < 0;
   },
 
   checkBlockCollision: function(block) {
@@ -551,17 +560,27 @@ TetrisField.prototype = {
   mergeBlock: function(block) {
     if(!(block instanceof Block))
       throw new TypeError("TetrisField.mergeBlock.block must instance of Block");
-    let tmp = this.blocks[block.getY()][block.getX()];
-    if(tmp)
-      console.log("[Warning] TetrisField.mergeBlock: Try override already exists location("
+    if(block.getX() >= this.width || block.getY() >= this.height) {
+      console.log("TetrisField.mergeBlock: Block's Vector2 out of bound Field size ("
+        +block.toString()+")");
+      return false;
+    }
+    if(this.blocks[block.getY()][block.getX()])
+      console.log("[Warning] TetrisField.mergeBlock: Try override already exists location ("
         +block.toString()+")");
     this.blocks[block.getY()][block.getX()] = block;
+    return true;
   },
 
   mergePiece: function(piece) {
     if(!(piece instanceof Piece))
       throw new TypeError("TetrisField.mergePiece.piece must instance of Piece");
-    for(let i in piece.blocks) this.mergeBlock(piece.blocks[i]);
+    for(let i in piece.blocks) if(!this.mergeBlock(piece.blocks[i])) {
+      console.log("TetrisField.mergePiece: Merge error in ("
+        +piece.toString()+")");
+      return false;
+    }
+    return true;
   },
 
   getFilledLine: function() {
@@ -602,6 +621,7 @@ function TetrisSeconderyField(size) {
   if(!Number.isInteger(size) || size < 1)
     throw new TypeError("TetrisSeconderyField.size must instance of Integer(1~)");
   this.width = size;
+  this.height = size;
   this.blocks = new Array(size);
   for(let i = 0; i < size; i++) {
     this.blocks[i] = new Array(size);
@@ -745,12 +765,28 @@ Tetris.prototype = {
   reset: function() {
     this.field = new TetrisSeconderyField(TetrisData.mapWidth);
     this.score = 0;
+    this._scoreList = {
+      Soft_Drop: 1,
+      Hard_Drop: 2,
+      Single_Line_Clear: 100,
+      Double_Line_Clear: 300,
+      Triple_Line_Clear: 400,
+      T_Spin: 500,
+      Tetris_Line_Clear: 800,
+      T_Spin_Single: 800,
+      T_Spin_Double: 1200,
+      T_Spin_Triple: 1600
+    };
+    this._scoreBonus = {
+      Back_To_Back: 1.5,
+      Cross: 2
+    };
     this.lastWork = 0;
     this.pauseTiming = 0;
     this.lastKeyEnter = 0;
     this.currentDirection = 0; //reverse
-    this.currentPiece = this.createPiece(this.currentDirection);
-    this.pieceAppearAnimateTiming = [Date.now(), Date.now()];
+    this.currentPiece = null;
+    this.pieceAppearAnimateTiming = [0, 0];
     this.pieceAppearAnimateDelay = 1000;
     this.nextPieceQueue = [];
     this.nextPieceQueueMax = 1;
@@ -763,6 +799,10 @@ Tetris.prototype = {
   start: function() {
     this.lastWork = Date.now();
     this.ready = true;
+    if(!this.currentPiece) {
+      this.currentPiece = this.createPiece(this.currentDirection);
+      this.pieceAppearAnimateTiming = [Date.now(), Date.now()];
+    }
   },
 
   stop: function() {
@@ -788,10 +828,10 @@ Tetris.prototype = {
   },
 
   tick: function() {
-    //0.05초마다 실행
+    //0.05sec repeat
     if(!this.ready || this._pause) return;
     if(Date.now() - this.lastWork > this.actionDelay) {
-      while(this.nextPieceQueue.length < this.nextPieceQueueMax)
+      while(this.nextPieceQueue.length < this.nextPieceQueueMax) //add piece at queue
         this.addNewPieceInQueue();
 
       if(this.currentDirection) { //Gravity on Left-Bottom
@@ -854,7 +894,7 @@ Tetris.prototype = {
       fillWithBlank(o, fieldBlocks[o]);
     }
 
-    fill(this.currentPiece.getBlocks());
+    if(this.currentPiece) fill(this.currentPiece.getBlocks());
   },
 
   sketchAfterDraw: function(ctx) {
@@ -998,17 +1038,19 @@ Tetris.prototype = {
    * @param {Piece} piece
    */
    mergeCurrentPiece: function() {
-     this.field.mergePiece(this.currentPiece);
+     if(!this.field.mergePiece(this.currentPiece)) { //Game Over detect
+       alert("gg");
+     }
      this.currentPiece = null;
    },
 
    checkFilledLines: function() { //TODO: Scoreing
      let lines = this.field.getFilledLine();
      if(lines[0].length > 0 || lines[1].length > 0) {
-       for(let i in lines[0]) {
+       for(let i = lines[0].length-1; i >= 0; i--) {
          this.field.deleteLines(0, lines[0][i], 1);
        }
-       for(let i in lines[1]) {
+       for(let i = lines[1].length-1; i >= 0; i--) {
          this.field.deleteLines(1, lines[1][i], 1);
        }
      }
@@ -1027,7 +1069,7 @@ timer.start(3);
 var ctx, tetrisInterval, ctxInterval;
 
 function setupContext() {
-  ctx = Sketch.create({container: document.getElementById("content")});
+  ctx = Sketch.create({container: document.getElementById("sketch")});
 
   //대각선 그리기
   ctx.diagonal = function(x, y, size, direction) {
@@ -1105,49 +1147,52 @@ function setupContext() {
     this.closePath();
     this.fill();
 
-    //Sub box 0 (leftTop)
-    this.fillStyle = color[0];
-    this.beginPath();
-    this.moveTo(cd[2][0], cd[2][1]);
-    this.lineTo(cd[2][0], cd[2][1]+blockHeight);
-    this.lineTo(cd[3][0]+blockHeight, cd[3][1]);
-    this.lineTo(cd[3][0], cd[3][1]);
-    this.closePath();
-    this.fill();
+    //Detail is only Enable on Desktop!
+    if(!this.mobile) {
+      //Sub box 0 (leftTop)
+      this.fillStyle = color[0];
+      this.beginPath();
+      this.moveTo(cd[2][0], cd[2][1]);
+      this.lineTo(cd[2][0], cd[2][1]+blockHeight);
+      this.lineTo(cd[3][0]+blockHeight, cd[3][1]);
+      this.lineTo(cd[3][0], cd[3][1]);
+      this.closePath();
+      this.fill();
 
-    //Sub box 1 (rightTop)
-    this.fillStyle = color[1];
-    this.beginPath();
-    this.moveTo(cd[2][0], cd[2][1]);
-    this.lineTo(cd[2][0], cd[2][1]+blockHeight);
-    this.lineTo(cd[1][0]-blockHeight, cd[1][1]);
-    this.lineTo(cd[1][0], cd[1][1]);
-    this.closePath();
-    this.fill();
+      //Sub box 1 (rightTop)
+      this.fillStyle = color[1];
+      this.beginPath();
+      this.moveTo(cd[2][0], cd[2][1]);
+      this.lineTo(cd[2][0], cd[2][1]+blockHeight);
+      this.lineTo(cd[1][0]-blockHeight, cd[1][1]);
+      this.lineTo(cd[1][0], cd[1][1]);
+      this.closePath();
+      this.fill();
 
-    //Sub box 2 (leftBottom)
-    this.fillStyle = color[4];
-    this.beginPath();
-    this.moveTo(cd[0][0], cd[0][1]);
-    this.lineTo(cd[0][0], cd[0][1]-blockHeight);
-    this.lineTo(cd[3][0]+blockHeight, cd[3][1]);
-    this.lineTo(cd[3][0], cd[3][1]);
-    this.closePath();
-    this.fill();
+      //Sub box 2 (leftBottom)
+      this.fillStyle = color[4];
+      this.beginPath();
+      this.moveTo(cd[0][0], cd[0][1]);
+      this.lineTo(cd[0][0], cd[0][1]-blockHeight);
+      this.lineTo(cd[3][0]+blockHeight, cd[3][1]);
+      this.lineTo(cd[3][0], cd[3][1]);
+      this.closePath();
+      this.fill();
 
-    //Sub box 3 (rightBottom)
-    this.fillStyle = color[5];
-    this.beginPath();
-    this.moveTo(cd[0][0], cd[0][1]);
-    this.lineTo(cd[0][0], cd[0][1]-blockHeight);
-    this.lineTo(cd[1][0]-blockHeight, cd[1][1]);
-    this.lineTo(cd[1][0], cd[1][1]);
-    this.closePath();
-    this.fill();
+      //Sub box 3 (rightBottom)
+      this.fillStyle = color[5];
+      this.beginPath();
+      this.moveTo(cd[0][0], cd[0][1]);
+      this.lineTo(cd[0][0], cd[0][1]-blockHeight);
+      this.lineTo(cd[1][0]-blockHeight, cd[1][1]);
+      this.lineTo(cd[1][0], cd[1][1]);
+      this.closePath();
+      this.fill();
+    }
   }
 
   ctx.drawTitle = function(visible) {
-
+    //TODO: Delete this if not used
   }
 
   /**
@@ -1159,10 +1204,15 @@ function setupContext() {
     if(this._whilePauseAnimate) return;
     ctx._pauseAniTiming = Date.now();
     if(visible) { //Pause screen appear animation
+      let statEle = document.getElementById("status")
+      statEle.classList.remove("statusUp");
+      statEle.classList.remove("statusUpEnd");
+      statEle.classList.add("statusDown");
+      setTimeout(function() {document.getElementById("status").classList.add("statusDownEnd")}, 450);
       this.tetris.pause();
       this._whilePauseAnimate = true;
-      this._pauseColor = stringifyColor.apply(this, hsvToRgb(random(0, 1), 1, 0.5));
-      this.drawAfterRegister["pause_screen"] = function(ctx) {
+      this._pauseColor = stringifyColor.apply(this, hsvToRgb(random(0, 1), random(0.5, 1), 0.75));
+      this.drawAfterWorkRegister["pause_screen"] = function(ctx) {
         let t1 = 500;
         let time = Date.now() - ctx._pauseAniTiming;
         let rh;
@@ -1204,15 +1254,20 @@ function setupContext() {
         }
       }
     }else { //Pause screen dismiss animation
+      let statEle = document.getElementById("status")
+      statEle.classList.remove("statusDown");
+      statEle.classList.remove("statusDownEnd");
+      statEle.classList.add("statusUp");
+      setTimeout(function() {document.getElementById("status").classList.add("statusUpEnd")}, 450);
       this._whilePauseAnimate = true;
-      this.drawAfterRegister["pause_screen"] = function(ctx) {
+      this.drawAfterWorkRegister["pause_screen"] = function(ctx) {
         let t1 = 500;
         let time = Date.now() - ctx._pauseAniTiming;
         let rh;
         if(time < t1) {
           rh = -ctx.height*pow(time/t1, 3);
         }else {
-          delete ctx.drawAfterRegister["pause_screen"];
+          delete ctx.drawAfterWorkRegister["pause_screen"];
           ctx._whilePauseAnimate = false;
           ctx.tetris.restart();
           return;
@@ -1252,7 +1307,7 @@ function setupContext() {
   }
 
   ctx.drawGameover = function(visible) {
-
+    //TODO: Delete this if not used
   }
 
   ctx.drawTouchButton = function(ctx) {
@@ -1269,18 +1324,19 @@ function setupContext() {
      * 3250 ~ 3500ms: Colse window
      */
     if(time < 3400) {
-      this._confirmReset = 0;
-      //this.tetris.stop();
+      this._confirmReset = 0; //Start point of reset
       this.tetris.reset();
-      this.tetris.start();
-      delete this.drawAfterRegister["confirm_reset"];
+      document.getElementById("titleScreen")["style"]["display"] = "block";
+      document.getElementById("content")["style"]["filter"] = "blur(6px)";
+      delete this.drawAfterWorkRegister["pause_screen"];
+      delete this.drawAfterWorkRegister["confirm_reset"];
     }else {
       this._confirmReset = Date.now();
-      this.drawAfterRegister["confirm_reset"] = function(ctx) {
+      this.drawAfterWorkRegister["confirm_reset"] = function(ctx) {
         let time = Date.now() - ctx._confirmReset;
         let t1 = 150, t2 = 3000, t3 = 150;
         if(time > t1+t2+t3) {
-          delete ctx.drawAfterRegister["confirm_reset"];
+          delete ctx.drawAfterWorkRegister["confirm_reset"];
         }else {
 
           if(time < t1) {
@@ -1493,6 +1549,16 @@ function setupContext() {
     ];
   }
 
+  ctx.checkTouchMode = function() {
+    this.setTouchMode(document.getElementById("setting_touchMode").checked);
+    if(this.getTouchMode()) {
+      this.buttonMeasure();
+      this.drawUiWorkRegister["button"] = function(ctx) {ctx.drawTouchButton(ctx)}
+    }else {
+      delete this.drawUiWorkRegister["button"];
+    }
+  }
+
   ctx.varReset = function() {
     this.touchMode = false;
     this._whilePauseAnimate = false;
@@ -1509,9 +1575,10 @@ function setupContext() {
     this._moreColor = [];
     this._onCollisionButtonIndexes = [];
     this.bottomPadding = 20;
-    this.drawBeforeRegister = [];
-    this.drawAfterRegister = [];
-    this.drawUiRegister = [];
+    this.drawBeforeWorkRegister = [];
+    this.drawAfterWorkRegister = [];
+    this.drawUiWorkRegister = [];
+    this.tickWorkRegister = [];
   }
 
   ctx.tick = function() {
@@ -1544,18 +1611,12 @@ function setupContext() {
     if(tetrisInterval)
       clearInterval(tetrisInterval);
     this.varReset();
-    this.setTouchMode(document.getElementById("setting_touchMode").checked);
+    this.mobile = window.mobileAndTabletcheck();
     this.tetris = new Tetris(); //Magic start here
-    this.tetris.start(); //TODO: remove this
     setInterval(function() {ctx.tetris.tick()}, 100);
-    this.drawBeforeRegister["tetris"] = function(ctx) {ctx.tetris.sketchBeforeDraw(ctx)};
-    this.drawAfterRegister["tetris"] = function(ctx) {ctx.tetris.sketchAfterDraw(ctx)};
-    if(this.getTouchMode()) {
-      this.buttonMeasure();
-      this.drawUiRegister["button"] = function(ctx) {ctx.drawTouchButton(ctx)}
-    }else {
-      delete this.drawUiRegister["button"];
-    }
+    this.drawBeforeWorkRegister["tetris"] = function(ctx) {ctx.tetris.sketchBeforeDraw(ctx)};
+    this.drawAfterWorkRegister["tetris"] = function(ctx) {ctx.tetris.sketchAfterDraw(ctx)};
+    this.checkTouchMode();
     setInterval(function() {ctx.tick()}, 30);
   }
 
@@ -1587,9 +1648,9 @@ function setupContext() {
   }
 
   ctx.draw = function() {
-    for(let i in this.drawBeforeRegister) {
-      if(typeof this.drawBeforeRegister[i] === "function")
-        this.drawBeforeRegister[i](this);
+    for(let i in this.drawBeforeWorkRegister) {
+      if(typeof this.drawBeforeWorkRegister[i] === "function")
+        this.drawBeforeWorkRegister[i](this);
     }
 
     //블럭 경계선
@@ -1655,18 +1716,19 @@ function setupContext() {
     this.closePath();
     this.stroke();
 
-    for(let i in this.drawAfterRegister) {
-      if(typeof this.drawAfterRegister[i] === "function")
-        this.drawAfterRegister[i](this);
+    for(let i in this.drawAfterWorkRegister) {
+      if(typeof this.drawAfterWorkRegister[i] === "function")
+        this.drawAfterWorkRegister[i](this);
     }
 
-    for(let i in this.drawUiRegister) {
-      if(typeof this.drawUiRegister[i] === "function")
-        this.drawUiRegister[i](this);
+    for(let i in this.drawUiWorkRegister) {
+      if(typeof this.drawUiWorkRegister[i] === "function")
+        this.drawUiWorkRegister[i](this);
     }
   }
 
   ctx.keydown = function() {
+    if(!this.tetris.isRun()) return;
     switch(true) {
       case this.keys.LEFT:
         this.tetris.moveLeft();
@@ -1712,6 +1774,8 @@ function setupContext() {
   }
 
   ctx.touchstart = function() {
+    if(!this.getTouchMode()) return;
+
     let indexes = [];
     for(let i in this.touches) {
       for(let j in this._touchButtons) {
@@ -1764,3 +1828,10 @@ console.log("Done("+timer.stop(3)+"ms)");
 window.addEventListener("blur", function(event) {
   if(ctx && !ctx.tetris.isPause()) ctx.drawPause(true);
 }, false);
+
+function onStartButton() {
+  document.getElementById("titleScreen")["style"]["display"] = "none";
+  document.getElementById("content")["style"]["filter"] = "none";
+  ctx.checkTouchMode();
+  ctx.tetris.start();
+}

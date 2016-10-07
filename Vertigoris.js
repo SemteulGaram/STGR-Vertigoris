@@ -207,6 +207,7 @@ function CanvasButton(ctx, vec1, vec2, clickAction, drawAction, repeatWhenHold, 
   this._ctx = ctx;
   this._v1 = vec1;
   this._v2 = vec2;
+  this._v3 = new Vector2(0, 0);
   this._click = clickAction;
   this._draw = drawAction;
   this._repeat = !!repeatWhenHold;
@@ -242,6 +243,14 @@ CanvasButton.prototype = {
   getVectorStart: function() {return this._v1},
 
   getVectorEnd: function() {return this._v2},
+
+  getVectorLocation: function() {return this._v3},
+
+  setVectorLocation: function(vec) {
+    if(!(vec instanceof Vector2))
+      throw new TypeError("CanvasButton.setVectorLocation.vec parameter must instance of Vector2");
+    this._v3 = vec;
+  },
 
   inCollision: function(vec) {
     return (this._v1.getX() <= vec.getX() && this._v2.getX() >= vec.getX())
@@ -279,15 +288,15 @@ CanvasButton.prototype = {
     let radius = min(cBtn.width, cBtn.height)/5;
 
     ctx.beginPath();
-    ctx.moveTo(this._v1.getX() + radius, this._v1.getY());
-    ctx.lineTo(this._v2.getX() - radius, this._v1.getY());
-    ctx.arcTo(this._v2.getX(), this._v1.getY(), this._v2.getX(), this._v1.getY() + radius, radius);
-    ctx.lineTo(this._v2.getX(), this._v2.getY() - radius);
-    ctx.arcTo(this._v2.getX(), this._v2.getY(), this._v2.getX() - radius, this._v2.getY(), radius);
-    ctx.lineTo(this._v1.getX() + radius, this._v2.getY());
-    ctx.arcTo(this._v1.getX(), this._v2.getY(), this._v1.getX(), this._v2.getY() - radius, radius);
-    ctx.lineTo(this._v1.getX(), this._v1.getY() + radius);
-    ctx.arcTo(this._v1.getX(), this._v1.getY(), this._v1.getX() + radius, this._v1.getY(), radius);
+    ctx.moveTo(this._v1.x + radius + this._v3.x, this._v1.y + this._v3.y);
+    ctx.lineTo(this._v2.x - radius + this._v3.x, this._v1.y + this._v3.y);
+    ctx.arcTo(this._v2.x + this._v3.x, this._v1.y + this._v3.y, this._v2.x + this._v3.x, this._v1.y + radius + this._v3.y, radius);
+    ctx.lineTo(this._v2.x + this._v3.x, this._v2.y - radius + this._v3.y);
+    ctx.arcTo(this._v2.x + this._v3.x, this._v2.y + this._v3.y, this._v2.x - radius + this._v3.x, this._v2.y + this._v3.y, radius);
+    ctx.lineTo(this._v1.x + radius + this._v3.x, this._v2.y + this._v3.y);
+    ctx.arcTo(this._v1.x + this._v3.x, this._v2.y + this._v3.y, this._v1.x + this._v3.x, this._v2.y - radius + this._v3.y, radius);
+    ctx.lineTo(this._v1.x + this._v3.x, this._v1.y + radius + this._v3.y);
+    ctx.arcTo(this._v1.x + this._v3.x, this._v1.y + this._v3.y, this._v1.x + radius + this._v3.x, this._v1.y + this._v3.y, radius);
     ctx.closePath();
 
     /* Reason: bad performance
@@ -1204,6 +1213,7 @@ function setupContext() {
     if(this._whilePauseAnimate) return;
     ctx._pauseAniTiming = Date.now();
     if(visible) { //Pause screen appear animation
+      ctx._pauseAniType = "Down";
       let statEle = document.getElementById("status")
       statEle.classList.remove("statusUp");
       statEle.classList.remove("statusUpEnd");
@@ -1254,6 +1264,7 @@ function setupContext() {
         }
       }
     }else { //Pause screen dismiss animation
+      ctx._pauseAniType = "Up";
       let statEle = document.getElementById("status")
       statEle.classList.remove("statusDown");
       statEle.classList.remove("statusDownEnd");
@@ -1311,7 +1322,27 @@ function setupContext() {
   }
 
   ctx.drawTouchButton = function(ctx) {
+    let btnLocWhilePause;
+    if(ctx._whilePauseAnimate) { //Calc control button loc
+      let timing = (Date.now() - ctx._pauseAniTiming) / 500;
+      if(ctx._pauseAniType === "Up") {
+        timing = 1 - timing;
+      }
+      btnLocWhilePause = new Vector2(0, timing*ctx.unit.onePct*50);
+    }
+
     for(let i in ctx._touchButtons) {
+      if(i < 6) { //Pause, Reset Button always visible
+        if(ctx._whilePauseAnimate) {
+          ctx._touchButtons[i].setVectorLocation(btnLocWhilePause);
+        }else {
+          if(ctx.tetris.isPause()) continue; //Hide control keys while pause
+          if(ctx._pauseAniType) { //reset location when pause end
+            ctx._pauseAniType = null;
+            ctx._touchButtons[i].setVectorLocation(new Vector(0, 0));
+          }
+        }
+      }
       ctx._touchButtons[i].draw(ctx);
     }
   }
@@ -1437,14 +1468,14 @@ function setupContext() {
     let unit = ctx.width > ctx.height ? ctx.height/100 : ctx.width/100;
     this._touchButtons = [
       new CanvasButton(this, //Left
-        new Vector2(ctx.width - unit*40, ctx.height - unit*20 - ctx.bottomPadding),
-        new Vector2(ctx.width - unit*25, ctx.height - unit*5 - ctx.bottomPadding),
+        new Vector2(unit*5, ctx.height - unit*20 - ctx.bottomPadding),
+        new Vector2(unit*20, ctx.height - unit*5 - ctx.bottomPadding),
         function(ctx) {ctx.tetris.moveLeft()}, function(ctx, cBtn, isClick) {
           ctx.fillStyle = isClick ? "#111" : "#333";
           ctx.beginPath();
-          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width/4, cBtn.getVectorStart().getY() + cBtn.height/2);
-          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/4, cBtn.getVectorStart().getY() + cBtn.height/5);
-          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/4, cBtn.getVectorEnd().getY() - cBtn.height/5);
+          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width/4 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height/2 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/4 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height/5 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/4 + cBtn._v3.x, cBtn.getVectorEnd().getY() - cBtn.height/5 + cBtn._v3.y);
           ctx.closePath();
           ctx.fill();
         }, true, 1, null, null),
@@ -1454,45 +1485,45 @@ function setupContext() {
         function(ctx) {ctx.tetris.moveRight()}, function(ctx, cBtn, isClick) {
           ctx.fillStyle = isClick ? "#111" : "#333";
           ctx.beginPath();
-          ctx.moveTo(cBtn.getVectorEnd().getX() - cBtn.width/4, cBtn.getVectorEnd().getY() - cBtn.height/2);
-          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/4, cBtn.getVectorEnd().getY() - cBtn.height/5);
-          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/4, cBtn.getVectorStart().getY() + cBtn.height/5);
+          ctx.moveTo(cBtn.getVectorEnd().getX() - cBtn.width/4 + cBtn._v3.x, cBtn.getVectorEnd().getY() - cBtn.height/2 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/4 + cBtn._v3.x, cBtn.getVectorEnd().getY() - cBtn.height/5 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/4 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height/5 + cBtn._v3.y);
           ctx.closePath();
           ctx.fill();
         }, true, 1, null, null),
       new CanvasButton(this, //Rotate Left
-        new Vector2(unit*5, ctx.height - unit*20 - ctx.bottomPadding),
-        new Vector2(unit*20, ctx.height - unit*5 - ctx.bottomPadding),
+        new Vector2(unit*25, ctx.height - unit*20 - ctx.bottomPadding),
+        new Vector2(unit*40, ctx.height - unit*5 - ctx.bottomPadding),
         function(ctx) {ctx.tetris.rotateLeft()}, function(ctx, cBtn, isClick) {
           ctx.fillStyle = isClick ? "#111" : "#333";
-          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*3/10, cBtn.getVectorEnd().getY() - cBtn.height*3/10,
+          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*3/10 + cBtn._v3.x, cBtn.getVectorEnd().getY() - cBtn.height*3/10 + cBtn._v3.y,
             cBtn.width*5/10, cBtn.height/10);
-          ctx.fillRect(cBtn.getVectorEnd().getX() - cBtn.width*3/10, cBtn.getVectorStart().getY() + cBtn.height*3/10,
+          ctx.fillRect(cBtn.getVectorEnd().getX() - cBtn.width*3/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*3/10 + cBtn._v3.y,
             cBtn.width/10, cBtn.height*5/10);
-          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*3/10, cBtn.getVectorStart().getY() + cBtn.height*3/10,
+          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*3/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*3/10 + cBtn._v3.y,
             cBtn.width*5/10, cBtn.height/10);
           ctx.beginPath();
-          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width*4/10, cBtn.getVectorStart().getY() + cBtn.height*2/10);
-          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width*4/10, cBtn.getVectorStart().getY() + cBtn.height*5/10);
-          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width*2/10, cBtn.getVectorStart().getY() + cBtn.height*3.5/10);
+          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width*4/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*2/10 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width*4/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*5/10 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width*2/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*3.5/10 + cBtn._v3.y);
           ctx.closePath();
           ctx.fill();
         }, true, 1, null, null),
       new CanvasButton(this, //Rotate Right
-        new Vector2(unit*25, ctx.height - unit*20 - ctx.bottomPadding),
-        new Vector2(unit*40, ctx.height - unit*5 - ctx.bottomPadding),
+        new Vector2(ctx.width - unit*40, ctx.height - unit*20 - ctx.bottomPadding),
+        new Vector2(ctx.width - unit*25, ctx.height - unit*5 - ctx.bottomPadding),
         function(ctx) {ctx.tetris.rotateRight()}, function(ctx, cBtn, isClick) {
           ctx.fillStyle = isClick ? "#111" : "#333";
-          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*2/10, cBtn.getVectorEnd().getY() - cBtn.height*3/10,
+          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*2/10 + cBtn._v3.x, cBtn.getVectorEnd().getY() - cBtn.height*3/10 + cBtn._v3.y,
             cBtn.width*5/10, cBtn.height/10);
-          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*2/10, cBtn.getVectorStart().getY() + cBtn.height*3/10,
+          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*2/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*3/10 + cBtn._v3.y,
             cBtn.width/10, cBtn.height*5/10);
-          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*2/10, cBtn.getVectorStart().getY() + cBtn.height*3/10,
+          ctx.fillRect(cBtn.getVectorStart().getX() + cBtn.width*2/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*3/10 + cBtn._v3.y,
             cBtn.width*5/10, cBtn.height/10);
           ctx.beginPath();
-          ctx.moveTo(cBtn.getVectorEnd().getX() - cBtn.width*4/10, cBtn.getVectorStart().getY() + cBtn.height*2/10);
-          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width*4/10, cBtn.getVectorStart().getY() + cBtn.height*5/10);
-          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width*2/10, cBtn.getVectorStart().getY() + cBtn.height*3.5/10);
+          ctx.moveTo(cBtn.getVectorEnd().getX() - cBtn.width*4/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*2/10 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width*4/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*5/10 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width*2/10 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*3.5/10 + cBtn._v3.y);
           ctx.closePath();
           ctx.fill();
         }, true, 1, null, null),
@@ -1502,9 +1533,9 @@ function setupContext() {
         function(ctx) {ctx.tetris.moveDown()}, function(ctx, cBtn, isClick) {
           ctx.fillStyle = isClick ? "#111" : "#333";
           ctx.beginPath();
-          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width/5, cBtn.getVectorStart().getY() + cBtn.height/4);
-          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/5, cBtn.getVectorStart().getY() + cBtn.height/4);
-          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/2, cBtn.getVectorEnd().getY() - cBtn.height/4);
+          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width/5 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height/4 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/5 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height/4 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/2 + cBtn._v3.x, cBtn.getVectorEnd().getY() - cBtn.height/4 + cBtn._v3.y);
           ctx.closePath();
           ctx.fill();
         }, true, 1, null, null),
@@ -1514,15 +1545,15 @@ function setupContext() {
         function(ctx) {ctx.tetris.instantDrop()}, function(ctx, cBtn, isClick) {
           ctx.fillStyle = isClick ? "#111" : "#333";
           ctx.beginPath();
-          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width/5, cBtn.getVectorStart().getY() + cBtn.height/5);
-          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/5, cBtn.getVectorStart().getY() + cBtn.height/5);
-          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/2, cBtn.getVectorEnd().getY() - cBtn.height*2/5);
+          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width/5 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height/5 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/5 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height/5 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/2 + cBtn._v3.x, cBtn.getVectorEnd().getY() - cBtn.height*2/5 + cBtn._v3.y);
           ctx.closePath();
           ctx.fill();
           ctx.beginPath();
-          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width/5, cBtn.getVectorStart().getY() + cBtn.height*2/5);
-          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/5, cBtn.getVectorStart().getY() + cBtn.height*2/5);
-          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/2, cBtn.getVectorEnd().getY() - cBtn.height/5);
+          ctx.moveTo(cBtn.getVectorStart().getX() + cBtn.width/5 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*2/5 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorEnd().getX() - cBtn.width/5 + cBtn._v3.x, cBtn.getVectorStart().getY() + cBtn.height*2/5 + cBtn._v3.y);
+          ctx.lineTo(cBtn.getVectorStart().getX() + cBtn.width/2 + cBtn._v3.x, cBtn.getVectorEnd().getY() - cBtn.height/5 + cBtn._v3.y);
           ctx.closePath();
           ctx.fill();
         }, false, 1, null, null),
@@ -1563,6 +1594,7 @@ function setupContext() {
     this.touchMode = false;
     this._whilePauseAnimate = false;
     this._pauseAniTiming = 0;
+    ctx._pauseAniType = null;
     this._pauseBoxString = [
       [3, 7], [4, 7], [5, 7], [3, 6], [5, 6], [3, 5], [4, 5], [5, 5], [3, 4], [3, 3], //P
       [7, 7], [8, 7], [9, 7], [7, 6], [9, 6], [7, 5], [8, 5], [9, 5], [7, 4], [9, 4], [7, 3], [9, 3], //A
@@ -1641,7 +1673,8 @@ function setupContext() {
       hCenter: this.width/2,
       //상하 패딩
       vPadding: this.width > this.height*9/10 ? this.height/20
-        : (this.height-this.width) / 2
+        : (this.height-this.width) / 2,
+      onePct: this.width > this.height ? this.height/100 : this.width/100,
     }
     this.buttonMeasure();
     console.log("Resized in " + new Date().toTimeString(), this.unit)

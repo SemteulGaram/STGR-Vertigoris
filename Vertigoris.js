@@ -575,7 +575,7 @@ TetrisField.prototype = {
       return false;
     }
     if(this.blocks[block.getY()][block.getX()])
-      console.log("[Warning] TetrisField.mergeBlock: Try override already exists location ("
+      console.warn("TetrisField.mergeBlock: Try override already exists location ("
         +block.toString()+")");
     this.blocks[block.getY()][block.getX()] = block;
     return true;
@@ -585,7 +585,7 @@ TetrisField.prototype = {
     if(!(piece instanceof Piece))
       throw new TypeError("TetrisField.mergePiece.piece must instance of Piece");
     for(let i in piece.blocks) if(!this.mergeBlock(piece.blocks[i])) {
-      console.log("TetrisField.mergePiece: Merge error in ("
+      console.log("TetrisField.mergePiece: Can't merge Piece ("
         +piece.toString()+")");
       return false;
     }
@@ -780,11 +780,17 @@ Tetris.prototype = {
       Single_Line_Clear: 100,
       Double_Line_Clear: 300,
       Triple_Line_Clear: 400,
+      Quadra_Line_Clear: 500,
       T_Spin: 500,
+      Penta_Line_Clear: 600,
+      Haxa_Line_Clear: 700,
       Tetris_Line_Clear: 800,
       T_Spin_Single: 800,
       T_Spin_Double: 1200,
-      T_Spin_Triple: 1600
+      T_Spin_Triple: 1600,
+      T_Spin_Quadra: 2000,
+      T_Spin_Penta: 2400,
+      T_Spin_Haxa: 3000
     };
     this._scoreBonus = {
       Back_To_Back: 1.5,
@@ -953,6 +959,7 @@ Tetris.prototype = {
       this.currentPiece.setLocation(direction);
       this.lastKeyEnter = Date.now();
       this.lastWork = Date.now(); //Fixed timing
+      this.addScore("Soft_Drop"); // add 1 score
     }
   },
 
@@ -1002,6 +1009,7 @@ Tetris.prototype = {
           this.currentPiece.setLocation(this.currentPiece.getLocation()
             .minus(new Vector2(this.currentDirection ? i-1 : 0,
             this.currentDirection ? 0 : i-1)));
+          this.addScore("Hard_Drop", null, 2*(i-1)); //add score 2 * distanse
 
           this.mergeCurrentPiece();
           this.shiftNextPieceFromQueue();
@@ -1018,6 +1026,19 @@ Tetris.prototype = {
   swapDirection: function() {
     if(this.currentDirection) this.currentDirection = 0;
     else this.currentDirection = 1;
+  },
+
+  getScore: function() {return this.score},
+
+  addScore: function(scoreType, bonusType, customScore) {
+    let newScore;
+    if(customScore) {
+      newScore = customScore;
+    }else {
+      newScore = this._scoreList[scoreType] * (bonusType ? this._scoreBonus[bonus] : 1);
+    }
+    this.score += newScore;
+    document.getElementById("score").innerHTML = this.score;
   },
 
   /**
@@ -1037,7 +1058,7 @@ Tetris.prototype = {
 
   shiftNextPieceFromQueue: function() {
     if(this.currentPiece)
-      console.log("[Warning] Tetris.currentPiece is already exists("
+      console.warn("Tetris.currentPiece is already exists("
         +this.currentPiece.toString()+"). Try override...");
     this.currentPiece = this.nextPieceQueue.shift();
   },
@@ -1048,13 +1069,65 @@ Tetris.prototype = {
    */
    mergeCurrentPiece: function() {
      if(!this.field.mergePiece(this.currentPiece)) { //Game Over detect
-       alert("gg");
+       onGameover();
+       return;
      }
      this.currentPiece = null;
    },
 
    checkFilledLines: function() { //TODO: Scoreing
      let lines = this.field.getFilledLine();
+
+     // Scoring
+     if(lines[0].length > 0 && lines[1].length > 0) { //Cross Direction Filled
+       let total = lines[0].length + lines[1].length;
+       let tetris = lines[0].length === 4 || lines[1].length === 4;
+       switch(lines[0].length || lines[1].length) {
+         case 2:
+          this.addScore("Double_Line_Clear", "Cross");
+          break;
+         case 3:
+          this.addScore("Triple_Line_Clear", "Cross");
+          break;
+         case 4:
+          this.addScore("Quadra_Line_Clear", "Cross");
+          break;
+         case 5:
+          if(tetris) {
+            this.addScore("Tetris_Line_Clear", "Cross");
+          }else {
+            this.addScore("Penta_Line_Clear", "Cross");
+          }
+          break;
+         case 6:
+          this.addScore("Haxa_Line_Clear", "Cross");
+          break;
+         default:
+          console.warn("Unknown Line Filled Situation x: "
+            + lines[0].join(" ") + " y: " + lines[1].join(" "));
+          break;
+       }
+     }else if(lines[0].length > 0 || lines[1].length > 0) { //Single Direction Filled
+       switch(lines[0].length || lines[1].length) {
+         case 1:
+          this.addScore("Single_Line_Clear");
+          break;
+         case 2:
+          this.addScore("Double_Line_Clear");
+          break;
+         case 3:
+          this.addScore("Triple_Line_Clear");
+          break;
+         case 4:
+          this.addScore("Tetris_Line_Clear");
+          break;
+         default:
+          console.warn("Unknown Line Filled Situation x: "
+            + lines[0].join(" ") + " y: " + lines[1].join(" "));
+          break;
+       }
+     }
+
      if(lines[0].length > 0 || lines[1].length > 0) {
        for(let i = lines[0].length-1; i >= 0; i--) {
          this.field.deleteLines(0, lines[0][i], 1);
@@ -1216,9 +1289,7 @@ function setupContext() {
       ctx._pauseAniType = "Down";
       let statEle = document.getElementById("status")
       statEle.classList.remove("statusUp");
-      statEle.classList.remove("statusUpEnd");
       statEle.classList.add("statusDown");
-      setTimeout(function() {document.getElementById("status").classList.add("statusDownEnd")}, 450);
       this.tetris.pause();
       this._whilePauseAnimate = true;
       this._pauseColor = stringifyColor.apply(this, hsvToRgb(random(0, 1), random(0.5, 1), 0.75));
@@ -1267,9 +1338,7 @@ function setupContext() {
       ctx._pauseAniType = "Up";
       let statEle = document.getElementById("status")
       statEle.classList.remove("statusDown");
-      statEle.classList.remove("statusDownEnd");
       statEle.classList.add("statusUp");
-      setTimeout(function() {document.getElementById("status").classList.add("statusUpEnd")}, 450);
       this._whilePauseAnimate = true;
       this.drawAfterWorkRegister["pause_screen"] = function(ctx) {
         let t1 = 500;
@@ -1863,8 +1932,17 @@ window.addEventListener("blur", function(event) {
 }, false);
 
 function onStartButton() {
-  document.getElementById("titleScreen")["style"]["display"] = "none";
-  document.getElementById("content")["style"]["filter"] = "none";
+  document.getElementById("titleScreen").style.display = "none";
+  document.getElementById("content").style.filter = "none";
   ctx.checkTouchMode();
   ctx.tetris.start();
+}
+
+function onGameover() {
+  ctx._confirmReset = 0; //Start point of reset
+  ctx.tetris.reset();
+  document.getElementById("titleScreen").style.display = "block";
+  document.getElementById("content").style.filter = "blur(6px)";
+  delete ctx.drawAfterWorkRegister["pause_screen"];
+  delete ctx.drawAfterWorkRegister["confirm_reset"];
 }

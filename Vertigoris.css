@@ -109,7 +109,7 @@ noscript {
 
 @keyframes statusDownAni {
   from {
-    top: 5%
+    top: 5%;
     transform: rotate(0deg);
   }
   to {
@@ -133,9 +133,6 @@ noscript {
   animation-name: statusDownAni;
   animation-duration: 500ms;
   animation-timing-function: ease-out;
-}
-
-.statusDownEnd {
   top: 75% !important;
   transform: rotate(-45deg);
 }
@@ -144,9 +141,6 @@ noscript {
   animation-name: statusUpAni;
   animation-duration: 500ms;
   animation-timing-function: ease-in;
-}
-
-.statusUpEnd {
   top: 5% !important;
   transform: rotate(0deg);
 }
@@ -155,12 +149,16 @@ noscript {
   float: right;
 }
 
-.title {
+.label {
+  display: inline-block;
+}
+
+#title {
   position: relative;
-  top: 50%;
+  top: 30%;
   left: 50%;
   width: 300px;
-  height: 48px;
+  height: 100px;
   margin: 0;
   margin-top: -24px;
   margin-left: -150px;
@@ -171,15 +169,7 @@ noscript {
   text-align: center;
 }
 
-.setting {
-
-}
-
-.label {
-  display: inline-block;
-}
-
-button#start {
+#start {
   position: fixed;
   left: 50%;
   top: 50%;
@@ -196,6 +186,12 @@ button#start {
   color: #fff;
   font-family: iceland;
   font-size: 64px;
+}
+
+#author {
+  position: fixed; right: 16px; bottom: 16px;
+  font-family: iceland; font-size: 16px;
+  margin: 0; padding: 0;
 }
 
 /***
@@ -288,7 +284,7 @@ button#start {
 }
 
 .checkbox1 input[type=checkbox]:checked + label:after {
-	background: #FF5722;
+	background: #4422ff;
 }
 
 .bc-red {

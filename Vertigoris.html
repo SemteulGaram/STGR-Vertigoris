@@ -4,6 +4,7 @@
   <head>
     <meta charset=utf-8 />
     <meta name="theme-color" content="#333333" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
     <title>Vertigoris</title>
     <link rel=stylesheet href=Vertigoris.css />
     <script type=text/javascript src=js/sketch.js></script>
@@ -32,27 +33,25 @@
     <div id=content>
       <div id=sketch></div>
       <div id=status>
-        <p id=levelLabel class="statusLabel">Level</p>
+        <!--<p id=levelLabel class="statusLabel">Level</p>
         <p id=level class="statusLabel floatR">1</p>
-        <hr>
+        <hr>-->
         <p id=scoreLabel class="statusLabel">Score</p>
         <p id=score class="statusLabel floatR">0</p>
       </div>
       <noscript>This game need javascript :/</noscript>
     </div>
     <div id=titleScreen>
-      <svg id=title></svg>
+      <p id=title>Vertigoris</p>
       <button id=start type=button value="Start" autofocus onClick="onStartButton()">Start</button>
-      <div id=setting class=setting>
+      <div id=setting>
         <div class=checkbox1>
           <input id=setting_touchMode type=checkbox value=None name=check />
           <label for=setting_touchMode></label>
         </div>
         <p class="label">Touch screen mode</p>
       </div>
-      <div id=setting2 class=setting>
-
-      </div>
     </div>
+    <p id=author>@SemteulGaram</p>
   </body>
 </html>

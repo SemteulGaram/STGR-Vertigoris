@@ -849,6 +849,8 @@ Tetris.prototype = {
       while(this.nextPieceQueue.length < this.nextPieceQueueMax) //add piece at queue
         this.addNewPieceInQueue();
 
+      this.autoFillCurrentPiece();
+
       if(this.currentDirection) { //Gravity on Left-Bottom
         if(this.field.checkPieceCollision(
           this.currentPiece.preCalculatePiece("left"), this.currentDirection)) {
@@ -870,17 +872,7 @@ Tetris.prototype = {
       }
 
       this.checkFilledLines();
-
-      if(!this.currentPiece) {
-        if(this.nextPieceQueue.length === 0) {
-          this.swapDirection();
-          this.currentPiece = this.createPiece();
-        }else {
-          this.shiftNextPieceFromQueue();
-          this.swapDirection();
-          this.addNewPieceInQueue();
-        }
-      }
+      this.autoFillCurrentPiece();
 
       this.lastWork = Date.now();
     }
@@ -1021,6 +1013,19 @@ Tetris.prototype = {
     }
 
     this.checkFilledLines();
+  },
+
+  autoFillCurrentPiece: function() {
+    if(!this.currentPiece) {
+      if(this.nextPieceQueue.length === 0) {
+        this.swapDirection();
+        this.currentPiece = this.createPiece();
+      }else {
+        this.shiftNextPieceFromQueue();
+        this.swapDirection();
+        this.addNewPieceInQueue();
+      }
+    }
   },
 
   swapDirection: function() {
